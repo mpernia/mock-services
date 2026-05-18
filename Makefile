@@ -116,6 +116,20 @@ release:
 	if [ -n "$$HTTPLIB_DIR" ]; then \
 		cp -a "$$HTTPLIB_DIR/include/"* $(RELEASE_DIR)/include/; \
 	fi
+	# Bundle SFTP dependencies (libssh + mbedtls), only when SFTP is enabled
+	if [ -d "$(BUILD_DIR)/_deps/libssh-build" ]; then \
+		mkdir -p $(RELEASE_DIR)/include/libssh $(RELEASE_DIR)/include/mbedtls $(RELEASE_DIR)/include/psa; \
+		cp -a $(BUILD_DIR)/_deps/libssh-src/include/libssh/*.h $(RELEASE_DIR)/include/libssh/; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-src/include/mbedtls/*.h $(RELEASE_DIR)/include/mbedtls/; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-src/include/psa/*.h $(RELEASE_DIR)/include/psa/; \
+		cp -a $(BUILD_DIR)/_deps/libssh-build/src/libssh.a $(RELEASE_DIR)/lib/; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-build/library/libmbedtls.a $(RELEASE_DIR)/lib/; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-build/library/libmbedcrypto.a $(RELEASE_DIR)/lib/; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-build/library/libmbedx509.a $(RELEASE_DIR)/lib/; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-build/3rdparty/everest/libeverest.a $(RELEASE_DIR)/lib/ 2>/dev/null || true; \
+		cp -a $(BUILD_DIR)/_deps/mbedtls-build/3rdparty/p256-m/libp256m.a $(RELEASE_DIR)/lib/ 2>/dev/null || true; \
+		strip --strip-debug $(RELEASE_DIR)/lib/libssh.a 2>/dev/null || true; \
+	fi
 	cp LICENSE $(RELEASE_DIR)/
 	RELEASE_TAG=$$(git describe --tags --always 2>/dev/null || echo "dev"); \
 	if [ -n "$(IS_LINUX)" ]; then \
