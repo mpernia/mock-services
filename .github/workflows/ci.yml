@@ -58,12 +58,13 @@ jobs:
             mingw-w64-i686-gcc
             mingw-w64-i686-cmake
             mingw-w64-i686-ninja
+            mingw-w64-i686-python-pip
             python
             git
+            zip
 
       - name: Install Conan & detect profile
         run: |
-          pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
           conan profile detect
 
