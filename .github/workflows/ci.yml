@@ -12,17 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Conan
+      - name: Install Conan & detect profile
         run: |
           pip install conan
           conan --version
+          conan profile detect
 
       - name: Configure and build
         run: |
           conan install . \
             --build=missing \
-            --profile:build=ci/profiles/linux-x86_64 \
-            --profile:host=ci/profiles/linux-x86_64 \
             -c tools.cmake.cmaketoolchain:generator="Unix Makefiles"
           cmake --preset conan-release
           cmake --build --preset conan-release
