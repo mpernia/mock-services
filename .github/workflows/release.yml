@@ -59,21 +59,24 @@ jobs:
         run: |
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
             --build=missing \
-            -s build_type=Release \
             -o "&:with_sftp=True"
-          cmake --preset conan-release -DMOCK_SERVICES_ENABLE_SFTP=ON
-          cmake --build --preset conan-release
+          cmake --preset conan-default -DMOCK_SERVICES_ENABLE_SFTP=ON
+          cmake --build --preset conan-default
 
       - name: Package
         shell: bash
         run: |
+          A_FILE=$(find . -name "libmock-services.a" -not -path "./dist/*" | head -1)
+          A_DIR=$(dirname "$A_FILE")
+          GEN_DIR=$(find . -path "*/generators/pugixml-*-data.cmake" -exec dirname {} \; | head -1)
+          echo "Library: $A_FILE | Generators: $GEN_DIR"
           mkdir -p dist/mock-services/lib dist/mock-services/include
-          cp build/Release/libmock-services.a dist/mock-services/lib/
+          cp "$A_FILE" dist/mock-services/lib/
           strip --strip-debug dist/mock-services/lib/libmock-services.a
           cp -r include/mock-services dist/mock-services/include/
           # Bundle pugixml (headers + static lib)
           PUGIXML_DIR=$(grep -h '^set(pugixml_PACKAGE_FOLDER_RELEASE' \
-            build/Release/generators/pugixml-*-data.cmake 2>/dev/null \
+            "$GEN_DIR"/pugixml-*-data.cmake 2>/dev/null \
             | head -1 | sed 's/.*"\(.*\)")$/\1/')
           if [ -n "$PUGIXML_DIR" ]; then
             cp -a "$PUGIXML_DIR/include/"* dist/mock-services/include/
@@ -82,7 +85,7 @@ jobs:
           fi
           # Bundle cpp-httplib headers (header-only)
           HTTPLIB_DIR=$(grep -h '^set(cpp-httplib_PACKAGE_FOLDER_RELEASE' \
-            build/Release/generators/httplib-*-data.cmake 2>/dev/null \
+            "$GEN_DIR"/httplib-*-data.cmake 2>/dev/null \
             | head -1 | sed 's/.*"\(.*\)")$/\1/')
           if [ -n "$HTTPLIB_DIR" ]; then
             cp -a "$HTTPLIB_DIR/include/"* dist/mock-services/include/
