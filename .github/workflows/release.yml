@@ -51,7 +51,7 @@ jobs:
 
       - name: Install Conan
         run: |
-          python -m ensurepip --upgrade
+          pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
 
       - name: Build
