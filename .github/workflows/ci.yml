@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan --version
+
+      - name: Configure and build
+        run: |
+          conan install . \
+            --build=missing \
+            --profile:build=ci/profiles/linux-x86_64 \
+            --profile:host=ci/profiles/linux-x86_64 \
+            -c tools.cmake.cmaketoolchain:generator="Unix Makefiles"
+          cmake --preset conan-release
+          cmake --build --preset conan-release
+
+      - name: Test
+        run: ctest --preset conan-release --output-on-failure
+
+      - name: Package
+        run: |
+          mkdir -p dist/mock-services/lib dist/mock-services/include
+          cp build/Release/libmock-services.a dist/mock-services/lib/
+          cp -r include/mock-services dist/mock-services/include/
+          cd dist && tar czf mock-services-${{ github.ref_name }}-linux-x86_64.tar.gz mock-services/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-services-linux-x86_64
+          path: dist/*.tar.gz
+
+  windows-i686:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: >
+            mingw-w64-i686-gcc
+            mingw-w64-i686-cmake
+            mingw-w64-i686-ninja
+            python
+            git
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Configure and build
+        run: |
+          python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
+            --build=missing \
+            --profile:build=ci/profiles/mingw32 \
+            --profile:host=ci/profiles/mingw32
+          cmake --preset conan-mingw32-release
+          cmake --build --preset conan-mingw32-release
+
+      - name: Test
+        run: ctest --preset conan-mingw32-release --output-on-failure
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist/mock-services/lib dist/mock-services/include
+          cp build/mingw32/Release/libmock-services.a dist/mock-services/lib/
+          cp -r include/mock-services dist/mock-services/include/
+          cd dist && zip -r mock-services-${{ github.ref_name }}-win32.zip mock-services/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-services-win32
+          path: dist/*.zip
