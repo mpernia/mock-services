@@ -49,31 +49,30 @@ jobs:
             python
             git
 
-      - name: Install Conan
+      - name: Install Conan & detect profile
         run: |
           pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
+          conan profile detect
 
       - name: Build
         run: |
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
             --build=missing \
-            -o "&:with_sftp=True" \
-            --profile:build=ci/profiles/mingw32 \
-            --profile:host=ci/profiles/mingw32
-          cmake --preset conan-mingw32-release -DMOCK_SERVICES_ENABLE_SFTP=ON
-          cmake --build --preset conan-mingw32-release
+            -o "&:with_sftp=True"
+          cmake --preset conan-release -DMOCK_SERVICES_ENABLE_SFTP=ON
+          cmake --build --preset conan-release
 
       - name: Package
         shell: bash
         run: |
           mkdir -p dist/mock-services/lib dist/mock-services/include
-          cp build/mingw32/Release/libmock-services.a dist/mock-services/lib/
+          cp build/Release/libmock-services.a dist/mock-services/lib/
           strip --strip-debug dist/mock-services/lib/libmock-services.a
           cp -r include/mock-services dist/mock-services/include/
           # Bundle pugixml (headers + static lib)
           PUGIXML_DIR=$(grep -h '^set(pugixml_PACKAGE_FOLDER_RELEASE' \
-            build/mingw32/Release/generators/pugixml-*-data.cmake 2>/dev/null \
+            build/Release/generators/pugixml-*-data.cmake 2>/dev/null \
             | head -1 | sed 's/.*"\(.*\)")$/\1/')
           if [ -n "$PUGIXML_DIR" ]; then
             cp -a "$PUGIXML_DIR/include/"* dist/mock-services/include/
@@ -82,7 +81,7 @@ jobs:
           fi
           # Bundle cpp-httplib headers (header-only)
           HTTPLIB_DIR=$(grep -h '^set(cpp-httplib_PACKAGE_FOLDER_RELEASE' \
-            build/mingw32/Release/generators/httplib-*-data.cmake 2>/dev/null \
+            build/Release/generators/httplib-*-data.cmake 2>/dev/null \
             | head -1 | sed 's/.*"\(.*\)")$/\1/')
           if [ -n "$HTTPLIB_DIR" ]; then
             cp -a "$HTTPLIB_DIR/include/"* dist/mock-services/include/

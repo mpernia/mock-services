@@ -62,28 +62,27 @@ jobs:
             python
             git
 
-      - name: Install Conan
+      - name: Install Conan & detect profile
         run: |
           pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
+          conan profile detect
 
       - name: Configure and build
         run: |
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
-            --build=missing \
-            --profile:build=ci/profiles/mingw32 \
-            --profile:host=ci/profiles/mingw32
-          cmake --preset conan-mingw32-release
-          cmake --build --preset conan-mingw32-release
+            --build=missing
+          cmake --preset conan-release
+          cmake --build --preset conan-release
 
       - name: Test
-        run: ctest --preset conan-mingw32-release --output-on-failure
+        run: ctest --preset conan-release --output-on-failure
 
       - name: Package
         shell: bash
         run: |
           mkdir -p dist/mock-services/lib dist/mock-services/include
-          cp build/mingw32/Release/libmock-services.a dist/mock-services/lib/
+          cp build/Release/libmock-services.a dist/mock-services/lib/
           cp -r include/mock-services dist/mock-services/include/
           cd dist && zip -r mock-services-${{ github.ref_name }}-win32.zip mock-services/
 
