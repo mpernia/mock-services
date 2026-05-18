@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan --version
+
+      - name: Build and package
+        run: make release
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            dist/mock-services-${{ github.ref_name }}-linux-x86_64.tar.gz
+
+  windows-i686:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: >
+            mingw-w64-i686-gcc
+            mingw-w64-i686-cmake
+            mingw-w64-i686-ninja
+            python
+            git
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Build
+        run: |
+          python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
+            --build=missing \
+            -o "&:with_sftp=True" \
+            --profile:build=ci/profiles/mingw32 \
+            --profile:host=ci/profiles/mingw32
+          cmake --preset conan-mingw32-release -DMOCK_SERVICES_ENABLE_SFTP=ON
+          cmake --build --preset conan-mingw32-release
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist/mock-services/lib dist/mock-services/include
+          cp build/mingw32/Release/libmock-services.a dist/mock-services/lib/
+          strip --strip-debug dist/mock-services/lib/libmock-services.a
+          cp -r include/mock-services dist/mock-services/include/
+          # Bundle pugixml (headers + static lib)
+          PUGIXML_DIR=$(grep -h '^set(pugixml_PACKAGE_FOLDER_RELEASE' \
+            build/mingw32/Release/generators/pugixml-*-data.cmake 2>/dev/null \
+            | head -1 | sed 's/.*"\(.*\)")$/\1/')
+          if [ -n "$PUGIXML_DIR" ]; then
+            cp -a "$PUGIXML_DIR/include/"* dist/mock-services/include/
+            cp -a "$PUGIXML_DIR/lib/"* dist/mock-services/lib/
+            strip --strip-debug dist/mock-services/lib/libpugixml.a 2>/dev/null || true
+          fi
+          # Bundle cpp-httplib headers (header-only)
+          HTTPLIB_DIR=$(grep -h '^set(cpp-httplib_PACKAGE_FOLDER_RELEASE' \
+            build/mingw32/Release/generators/httplib-*-data.cmake 2>/dev/null \
+            | head -1 | sed 's/.*"\(.*\)")$/\1/')
+          if [ -n "$HTTPLIB_DIR" ]; then
+            cp -a "$HTTPLIB_DIR/include/"* dist/mock-services/include/
+          fi
+          cp LICENSE README.md dist/mock-services/
+          cd dist && zip -r mock-services-${{ github.ref_name }}-win32.zip mock-services/
+
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            dist/mock-services-${{ github.ref_name }}-win32.zip
+
+  create-release:
+    runs-on: ubuntu-24.04
+    needs: [linux-x86_64, windows-i686]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
