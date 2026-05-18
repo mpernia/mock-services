@@ -60,7 +60,9 @@ jobs:
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
             --build=missing \
             -o "&:with_sftp=True"
-          cmake --preset conan-default -DMOCK_SERVICES_ENABLE_SFTP=ON
+          # Try conan-release preset; fall back to conan-default if unavailable
+          cmake --preset conan-release -DMOCK_SERVICES_ENABLE_SFTP=ON 2>/dev/null \
+            || cmake --preset conan-default -DMOCK_SERVICES_ENABLE_SFTP=ON
           cmake --build --preset conan-release
 
       - name: Package

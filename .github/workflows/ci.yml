@@ -71,7 +71,9 @@ jobs:
         run: |
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
             --build=missing
-          cmake --preset conan-default
+          # Try conan-release preset; fall back to conan-default if unavailable
+          cmake --preset conan-release 2>/dev/null \
+            || cmake --preset conan-default
           cmake --build --preset conan-release
 
       - name: Test
