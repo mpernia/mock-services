@@ -66,12 +66,12 @@ jobs:
           pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
           conan profile detect
-          conan profile update settings.build_type=Release default
 
       - name: Configure and build
         run: |
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
-            --build=missing
+            --build=missing \
+            -s build_type=Release
           cmake --preset conan-release
           cmake --build --preset conan-release
 

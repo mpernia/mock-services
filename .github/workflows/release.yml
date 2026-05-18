@@ -54,12 +54,12 @@ jobs:
           pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
           conan profile detect
-          conan profile update settings.build_type=Release default
 
       - name: Build
         run: |
           python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
             --build=missing \
+            -s build_type=Release \
             -o "&:with_sftp=True"
           cmake --preset conan-release -DMOCK_SERVICES_ENABLE_SFTP=ON
           cmake --build --preset conan-release
