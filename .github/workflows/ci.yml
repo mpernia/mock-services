@@ -34,7 +34,7 @@ jobs:
           mkdir -p dist/mock-services/lib dist/mock-services/include
           cp build/Release/libmock-services.a dist/mock-services/lib/
           cp -r include/mock-services dist/mock-services/include/
-          cd dist && tar czf mock-services-${{ github.ref_name }}-linux-x86_64.tar.gz mock-services/
+          cd dist && tar czf mock-services-${{ github.sha }}-linux-x86_64.tar.gz mock-services/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -66,6 +66,7 @@ jobs:
           pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
           conan profile detect
+          conan profile update settings.build_type=Release default
 
       - name: Configure and build
         run: |
@@ -83,7 +84,7 @@ jobs:
           mkdir -p dist/mock-services/lib dist/mock-services/include
           cp build/Release/libmock-services.a dist/mock-services/lib/
           cp -r include/mock-services dist/mock-services/include/
-          cd dist && zip -r mock-services-${{ github.ref_name }}-win32.zip mock-services/
+          cd dist && zip -r mock-services-${{ github.sha }}-win32.zip mock-services/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

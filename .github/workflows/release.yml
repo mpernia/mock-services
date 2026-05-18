@@ -54,6 +54,7 @@ jobs:
           pacman -S --noconfirm mingw-w64-i686-python-pip
           python -m pip install conan
           conan profile detect
+          conan profile update settings.build_type=Release default
 
       - name: Build
         run: |
