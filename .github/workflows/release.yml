@@ -18,6 +18,7 @@ jobs:
         run: |
           pip install conan
           conan --version
+          conan profile detect
 
       - name: Build and package
         run: make release
@@ -49,7 +50,9 @@ jobs:
             git
 
       - name: Install Conan
-        run: python -m pip install conan
+        run: |
+          python -m ensurepip --upgrade
+          python -m pip install conan
 
       - name: Build
         run: |
