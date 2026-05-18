@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Conan & detect profile
+        run: |
+          pip install conan
+          conan --version
+          conan profile detect
+
+      - name: Configure and build
+        run: |
+          conan install . \
+            --build=missing \
+            -c tools.cmake.cmaketoolchain:generator="Unix Makefiles"
+          cmake --preset conan-release
+          cmake --build --preset conan-release
+
+      - name: Test
+        run: ctest --preset conan-release --output-on-failure
+
+      - name: Package
+        run: |
+          mkdir -p dist/mock-services/lib dist/mock-services/include
+          cp build/Release/libmock-services.a dist/mock-services/lib/
+          cp -r include/mock-services dist/mock-services/include/
+          cd dist && tar czf mock-services-${{ github.sha }}-linux-x86_64.tar.gz mock-services/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-services-linux-x86_64
+          path: dist/*.tar.gz
+
+  windows-i686:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: >
+            mingw-w64-i686-gcc
+            mingw-w64-i686-cmake
+            mingw-w64-i686-ninja
+            mingw-w64-i686-python-pip
+            python
+            git
+            zip
+
+      - name: Install Conan & detect profile
+        run: |
+          python -m pip install conan
+          conan profile detect
+
+      - name: Configure and build
+        run: |
+          python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
+            --build=missing
+          # Try conan-release preset; fall back to conan-default if unavailable
+          cmake --preset conan-release 2>/dev/null \
+            || cmake --preset conan-default
+          cmake --build --preset conan-release
+
+      - name: Test
+        run: ctest --preset conan-release --output-on-failure
+
+      - name: Package
+        shell: msys2 {0}
+        run: |
+          # Look for any mock-services static library (.a for GCC/MinGW, .lib for MSVC)
+          A_FILE=$(find build -name "libmock-services.a" -o -name "mock-services.lib" -o -name "*.a" | grep -i "mock" | head -1)
+          if [ -z "$A_FILE" ]; then
+            A_FILE=$(find build -name "*.a" -type f | head 1)
+          fi
+          if [ -z "$A_FILE" ]; then
+            A_FILE=$(find build -name "*.lib" -type f | grep -i "mock" | head -1)
+          fi
+          echo "Library: $A_FILE"
+          mkdir -p dist/mock-services/lib dist/mock-services/include
+          # Normalize library name to libmock-services.a
+          cp "$A_FILE" dist/mock-services/lib/libmock-services.a 2>/dev/null || echo "WARN: no static lib found"
+          cp -r include/mock-services dist/mock-services/include/
+          cd dist && zip -r mock-services-${{ github.sha }}-win32.zip mock-services/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mock-services-win32
+          path: dist/*.zip

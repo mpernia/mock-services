@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    needs: create-release
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan --version
+          conan profile detect
+
+      - name: Build and package
+        run: make release
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            dist/mock-services-${{ github.ref_name }}-linux-x86_64.tar.gz
+
+  windows-i686:
+    needs: create-release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: >
+            mingw-w64-i686-gcc
+            mingw-w64-i686-cmake
+            mingw-w64-i686-ninja
+            mingw-w64-i686-python-pip
+            python
+            git
+            zip
+
+      - name: Install Conan & detect profile
+        run: |
+          python -m pip install conan
+          conan profile detect
+
+      - name: Build
+        run: |
+          python -c "from conans.conan import run; import sys; sys.exit(run())" install . \
+            --build=missing
+          cmake --preset conan-release 2>/dev/null \
+            || cmake --preset conan-default
+          cmake --build --preset conan-release
+
+      - name: Package
+        shell: msys2 {0}
+        run: |
+          # Look for any mock-services static library (.a for GCC/MinGW, .lib for MSVC)
+          A_FILE=$(find build -name "libmock-services.a" -o -name "mock-services.lib" -o -name "*.a" | grep -i "mock" | head -1)
+          if [ -z "$A_FILE" ]; then
+            A_FILE=$(find build -name "*.a" -type f | head -1)
+          fi
+          if [ -z "$A_FILE" ]; then
+            A_FILE=$(find build -name "*.lib" -type f | grep -i "mock" | head -1)
+          fi
+          echo "Library: $A_FILE"
+          A_DIR=$(dirname "$A_FILE")
+          GEN_DIR=$(find . -path "*/generators/pugixml-*-data.cmake" -exec dirname {} \; | head -1)
+          echo "Library: $A_FILE | Generators: $GEN_DIR"
+          mkdir -p dist/mock-services/lib dist/mock-services/include
+          # Normalize library name to libmock-services.a
+          cp "$A_FILE" dist/mock-services/lib/libmock-services.a
+          # Strip if it's an ELF binary (.a from MinGW/GCC), skip if MSVC .lib
+          file dist/mock-services/lib/libmock-services.a | grep -qi "ar archive\|ELF" 2>/dev/null \
+            && strip --strip-debug dist/mock-services/lib/libmock-services.a 2>/dev/null || true
+          cp -r include/mock-services dist/mock-services/include/
+          # Bundle pugixml (headers + static lib)
+          PUGIXML_DIR=$(grep -h '^set(pugixml_PACKAGE_FOLDER_RELEASE' \
+            "$GEN_DIR"/pugixml-*-data.cmake 2>/dev/null \
+            | head -1 | sed 's/.*"\(.*\)")$/\1/')
+          if [ -n "$PUGIXML_DIR" ]; then
+            cp -a "$PUGIXML_DIR/include/"* dist/mock-services/include/
+            cp -a "$PUGIXML_DIR/lib/"* dist/mock-services/lib/
+            strip --strip-debug dist/mock-services/lib/libpugixml.a 2>/dev/null || true
+          fi
+          # Bundle cpp-httplib headers (header-only)
+          HTTPLIB_DIR=$(grep -h '^set(cpp-httplib_PACKAGE_FOLDER_RELEASE' \
+            "$GEN_DIR"/httplib-*-data.cmake 2>/dev/null \
+            | head -1 | sed 's/.*"\(.*\)")$/\1/')
+          if [ -n "$HTTPLIB_DIR" ]; then
+            cp -a "$HTTPLIB_DIR/include/"* dist/mock-services/include/
+          fi
+          cp LICENSE README.md dist/mock-services/
+          cd dist && zip -r mock-services-${{ github.ref_name }}-win32.zip mock-services/
+
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            dist/mock-services-${{ github.ref_name }}-win32.zip
+
+  create-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes || true

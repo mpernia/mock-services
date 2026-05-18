@@ -1,0 +1,17 @@
+---
+name: Config change
+about: Changes to CI, build system, or project configuration
+title: ''
+labels: chore
+assignees: ''
+
+---
+
+**What needs to change**
+A clear description of the configuration change.
+
+**Reason**
+Why this change is needed.
+
+**Additional context**
+Any relevant context or references.
