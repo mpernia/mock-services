@@ -64,9 +64,14 @@ jobs:
           cmake --build --preset conan-release
 
       - name: Package
-        shell: bash
+        shell: msys2 {0}
         run: |
           A_FILE=$(find . -name "libmock-services.a" -not -path "./dist/*" | head -1)
+          if [ -z "$A_FILE" ]; then
+            A_FILE="build/Release/libmock-services.a"
+            [ ! -f "$A_FILE" ] && A_FILE="build/libmock-services.a"
+            [ ! -f "$A_FILE" ] && A_FILE="$(find build -name '*.a' -type f | head -1)"
+          fi
           A_DIR=$(dirname "$A_FILE")
           GEN_DIR=$(find . -path "*/generators/pugixml-*-data.cmake" -exec dirname {} \; | head -1)
           echo "Library: $A_FILE | Generators: $GEN_DIR"

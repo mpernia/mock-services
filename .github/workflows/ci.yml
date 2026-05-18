@@ -78,10 +78,16 @@ jobs:
         run: ctest --preset conan-release --output-on-failure
 
       - name: Package
-        shell: bash
+        shell: msys2 {0}
         run: |
           A_FILE=$(find . -name "libmock-services.a" -not -path "./dist/*" | head -1)
-          echo "Found library: $A_FILE"
+          if [ -z "$A_FILE" ]; then
+            echo "find failed, trying known paths..."
+            A_FILE="build/Release/libmock-services.a"
+            [ ! -f "$A_FILE" ] && A_FILE="build/libmock-services.a"
+            [ ! -f "$A_FILE" ] && A_FILE="$(find build -name '*.a' -type f | head -1)"
+          fi
+          echo "Library: $A_FILE"
           mkdir -p dist/mock-services/lib dist/mock-services/include
           cp "$A_FILE" dist/mock-services/lib/
           cp -r include/mock-services dist/mock-services/include/
