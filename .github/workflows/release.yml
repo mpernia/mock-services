@@ -61,7 +61,7 @@ jobs:
             --build=missing \
             -o "&:with_sftp=True"
           cmake --preset conan-default -DMOCK_SERVICES_ENABLE_SFTP=ON
-          cmake --build --preset conan-default
+          cmake --build --preset conan-release
 
       - name: Package
         shell: bash
