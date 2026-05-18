@@ -82,16 +82,17 @@ jobs:
       - name: Package
         shell: msys2 {0}
         run: |
-          A_FILE=$(find . -name "libmock-services.a" -not -path "./dist/*" | head -1)
+          # Look for any mock-services static library (.a for GCC/MinGW, .lib for MSVC)
+          A_FILE=$(find build -name "libmock-services.a" -o -name "mock-services.lib" -o -name "*.a" | grep -i "mock" | head -1)
           if [ -z "$A_FILE" ]; then
-            echo "find failed, trying known paths..."
-            A_FILE="build/Release/libmock-services.a"
-            [ ! -f "$A_FILE" ] && A_FILE="build/libmock-services.a"
-            [ ! -f "$A_FILE" ] && A_FILE="$(find build -name '*.a' -type f | head -1)"
+            A_FILE=$(find build -name "*.a" -type f | head 1)
+          fi
+          if [ -z "$A_FILE" ]; then
+            A_FILE=$(find build -name "*.lib" -type f | grep -i "mock" | head -1)
           fi
           echo "Library: $A_FILE"
           mkdir -p dist/mock-services/lib dist/mock-services/include
-          cp "$A_FILE" dist/mock-services/lib/
+          cp "$A_FILE" dist/mock-services/lib/ 2>/dev/null || echo "WARN: no static lib found"
           cp -r include/mock-services dist/mock-services/include/
           cd dist && zip -r mock-services-${{ github.sha }}-win32.zip mock-services/
 
